@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>sbfb Studio - Visual OS</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: #1e1e1e; color: #fff; }
+        h1 { margin-top: 0; font-size: 24px; color: #4CAF50; display: inline-block; margin-bottom: 0; }
+        
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        
+        .workspace { display: flex; gap: 20px; height: calc(100vh - 80px); }
+        
+        /* LEFT SIDE: Block Builder */
+        .panel-left { flex: 1.2; display: flex; gap: 10px; background: #222; border: 1px solid #444; border-radius: 8px; padding: 10px; overflow: hidden; }
+        
+        /* Block Palette */
+        .palette { width: 180px; background: #2a2a2a; border-radius: 5px; padding: 10px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+        .palette-header { font-size: 11px; font-weight: bold; color: #aaa; text-transform: uppercase; margin-top: 10px; margin-bottom: 2px; border-bottom: 1px solid #444; padding-bottom: 4px; }
+        
+        /* The Visual Blocks ("Scratch-ish" style) */
+        .block { 
+            padding: 10px 12px; 
+            border-radius: 4px; 
+            color: #fff; 
+            font-weight: bold; 
+            font-size: 13px; 
+            cursor: grab; 
+            user-select: none; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3); 
+            border-left: 8px solid rgba(0,0,0,0.25);
+            margin-bottom: 2px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .block:active { cursor: grabbing; }
+        .block-row { display: flex; align-items: center; gap: 6px; }
+        
+        /* Prevent dragging when typing */
+        .block input, .block select, .block textarea { 
+            padding: 4px; border-radius: 4px; border: none; outline: none; 
+            font-family: monospace; font-size: 13px; cursor: text; 
+            background: rgba(255,255,255,0.9); color: #000;
+        }
+        
+        /* Block Category Colors */
+        .block-event { background-color: #ffbf00; color: #000; } /* Yellow */
+        .block-script { background-color: #4cbfe6; color: #000; } /* Cyan */
+        .block-logic { background-color: #ff6680; } /* Pink/Red */
+        .block-loop { background-color: #ffab19; color: #000; } /* Orange */
+        .block-output { background-color: #9966ff; } /* Purple */
+        .block-ai { background-color: #0fbd8c; } /* Green */
+        
+        /* Block Drop Zone */
+        .block-canvas-container { flex: 1; display: flex; flex-direction: column; }
+        .block-canvas { 
+            flex: 1; background: #1a1a1a; border: 2px dashed #444; 
+            border-radius: 5px; padding: 15px; display: flex; 
+            flex-direction: column; gap: 4px; overflow-y: auto; min-height: 200px; 
+        }
+        .block-canvas.dragover { border-color: #4CAF50; background: #253325; }
+        
+        /* Delete Zone */
+        .delete-zone { height: 40px; margin-top: 10px; background: #ff555533; border: 1px dashed #ff5555; color: #ff5555; display: flex; justify-content: center; align-items: center; border-radius: 5px; font-weight: bold; }
+        
+        .btn { background-color: #4CAF50; color: white; padding: 12px 20px; border: none; cursor: pointer; font-size: 16px; border-radius: 5px; margin-top: 10px; font-weight: bold; width: 100%; transition: 0.2s; }
+        .btn:hover { background-color: #45a049; }
+        
+        /* RIGHT SIDE: Preview & Terminal */
+        .panel-right { flex: 1; display: flex; flex-direction: column; }
+        .preview-header { background: #333; padding: 5px 15px; border-radius: 5px 5px 0 0; font-size: 14px; font-weight: bold; color: #ccc; }
+        .browser-preview { flex: 1.5; background-color: #ffffff; border: none; border-radius: 0 0 5px 5px; margin-bottom: 10px; width: 100%; }
+        
+        .terminal { flex: 1; background-color: #000000; color: #00FF00; padding: 15px; font-family: monospace; white-space: pre-wrap; overflow-y: auto; border-radius: 5px 5px 0 0; border: 1px solid #333; border-bottom: none; }
+        
+        .chat-bar { display: none; background: #222; padding: 10px; border: 1px solid #333; border-top: none; border-radius: 0 0 5px 5px; }
+        .chat-input { flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #444; background: #111; color: #00d2ff; font-family: monospace; }
+        .chat-btn { background: #00d2ff; color: #000; font-weight: bold; border: none; padding: 8px 15px; margin-left: 10px; border-radius: 4px; cursor: pointer; }
+        
+        .ai-text { color: #00d2ff; font-weight: bold; }
+        .error-text { color: #ff5555; }
+        .var-text { color: #ffb86c; }
+        #codeInput { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="top-bar">
+        <h1>SBFB Studio <span style="color:#aaa; font-size: 16px;">| Visual Block Coder</span></h1>
+    </div>
+
+    <div class="workspace">
+        
+        <!-- LEFT SIDE: The Drag and Drop Builder -->
+        <div class="panel-left">
+            <!-- The Palette -->
+            <div class="palette">
+                <div class="palette-header" style="margin-top:0;">Events</div>
+                <div class="block block-event" draggable="true" ondragstart="drag(event)" data-type="start">🏁 start:SBFB</div>
+                <div class="block block-event" draggable="true" ondragstart="drag(event)" data-type="end">🛑 &lt;end:SBFB&gt;</div>
+                
+                <div class="palette-header">Scripts (Web & Py)</div>
+                <div class="block block-script" draggable="true" ondragstart="drag(event)" data-type="html">🌐 Insert HTML</div>
+                <div class="block block-script" draggable="true" ondragstart="drag(event)" data-type="js">⚡ Insert JS</div>
+                <div class="block block-script" draggable="true" ondragstart="drag(event)" data-type="py">🐍 Insert Python</div>
+                
+                <div class="palette-header">Data & Math</div>
+                <div class="block block-logic" draggable="true" ondragstart="drag(event)" data-type="var">📦 Variable</div>
+                <div class="block block-logic" draggable="true" ondragstart="drag(event)" data-type="math">🧮 Math</div>
+                
+                <div class="palette-header">Control Loops</div>
+                <div class="block block-loop" draggable="true" ondragstart="drag(event)" data-type="repeat">🔁 Repeat {</div>
+                <div class="block block-loop" draggable="true" ondragstart="drag(event)" data-type="endrepeat">} End Repeat</div>
+                
+                <div class="palette-header">Output</div>
+                <div class="block block-output" draggable="true" ondragstart="drag(event)" data-type="print">🖨️ Print Text/Var</div>
+                
+                <div class="palette-header">Advanced AI</div>
+                <div class="block block-ai" draggable="true" ondragstart="drag(event)" data-type="ai">🧠 Init Isaahi Brain</div>
+            </div>
+            
+            <!-- Workspace Canvas -->
+            <div class="block-canvas-container">
+                <div class="block-canvas" id="blockCanvas" ondrop="drop(event)" ondragover="allowDrop(event)">
+                    <div id="canvasHint" style="color: #666; text-align: center; margin-top: 50px;">Drag blocks here!</div>
+                </div>
+                
+                <div class="delete-zone" ondrop="deleteDrop(event)" ondragover="allowDrop(event)">
+                    🗑️ Drag block here to delete
+                </div>
+                
+                <button class="btn" onclick="compileAndRun()">▶ Compile & Run SBFB</button>
+            </div>
+        </div>
+
+        <!-- RIGHT SIDE: Preview & Terminal -->
+        <div class="panel-right">
+            <div class="preview-header">Live Web Preview</div>
+            <iframe id="webPreview" class="browser-preview"></iframe>
+
+            <div class="preview-header">Terminal Output</div>
+            <div class="terminal" id="outputScreen">Waiting for blocks...</div>
+            
+            <div class="chat-bar" id="aiChatBox">
+                <input type="text" id="userChatMsg" class="chat-input" placeholder="Chat with Isaahi AI...">
+                <button class="chat-btn" onclick="chatWithIsaahi()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Bridge Textarea -->
+    <textarea id="codeInput"></textarea>
+
+    <script>
+        // ==========================================
+        // 1. BLOCK GENERATION & DRAG/DROP
+        // ==========================================
+        let blockIdCounter = 0;
+
+        function allowDrop(ev) {
+            ev.preventDefault();
+            document.getElementById('blockCanvas').classList.add('dragover');
+        }
+
+        function drag(ev) {
+            if (ev.target.hasAttribute('data-type')) {
+                ev.dataTransfer.setData("blockType", ev.target.getAttribute('data-type'));
+                ev.dataTransfer.setData("source", "palette");
+            } else {
+                ev.dataTransfer.setData("blockId", ev.target.id);
+                ev.dataTransfer.setData("source", "canvas");
+            }
+        }
+
+        function drop(ev) {
+            ev.preventDefault();
+            const canvas = document.getElementById('blockCanvas');
+            canvas.classList.remove('dragover');
+            document.getElementById('canvasHint').style.display = 'none';
+
+            const source = ev.dataTransfer.getData("source");
+            if (source === "palette") {
+                const type = ev.dataTransfer.getData("blockType");
+                canvas.appendChild(createBlockElement(type));
+            } else if (source === "canvas") {
+                const id = ev.dataTransfer.getData("blockId");
+                canvas.appendChild(document.getElementById(id));
+            }
+        }
+
+        function deleteDrop(ev) {
+            ev.preventDefault();
+            const source = ev.dataTransfer.getData("source");
+            if (source === "canvas") {
+                document.getElementById(ev.dataTransfer.getData("blockId")).remove();
+            }
+            document.getElementById('blockCanvas').classList.remove('dragover');
+            if (document.getElementById('blockCanvas').children.length <= 1) {
+                document.getElementById('canvasHint').style.display = 'block';
+            }
+        }
+
+        // Stops input clicks from dragging the block
+        const stopDrag = `onmousedown="event.stopPropagation()"`;
+
+        function createBlockElement(type) {
+            const el = document.createElement('div');
+            el.className = 'block';
+            el.id = 'block_' + blockIdCounter++;
+            el.draggable = true;
+            el.ondragstart = drag;
+            el.dataset.type = type;
+
+            if (type === 'start') {
+                el.classList.add('block-event'); el.innerHTML = '🏁 start:SBFB';
+            } 
+            else if (type === 'end') {
+                el.classList.add('block-event'); el.innerHTML = '🛑 &lt;end:SBFB&gt;';
+            }
+            else if (type === 'html') {
+                el.classList.add('block-script');
+                el.innerHTML = `<div>🌐 Insert HTML</div><textarea class="val-code" rows="3" ${stopDrag} placeholder="<h1>Hello!</h1>"></textarea>`;
+            }
+            else if (type === 'js') {
+                el.classList.add('block-script');
+                el.innerHTML = `<div>⚡ Insert JavaScript</div><textarea class="val-code" rows="3" ${stopDrag} placeholder="alert('Hi!');"></textarea>`;
+            }
+            else if (type === 'py') {
+                el.classList.add('block-script');
+                el.innerHTML = `<div>🐍 Insert Python</div><textarea class="val-code" rows="3" ${stopDrag} placeholder='print("Python rules!")'></textarea>`;
+            }
+            else if (type === 'var') {
+                el.classList.add('block-logic');
+                el.innerHTML = `<div class="block-row">let <input type="text" placeholder="name" class="var-name" style="width:60px;" ${stopDrag}> = <input type="text" placeholder="value" class="var-val" style="width:80px;" ${stopDrag}></div>`;
+            }
+            else if (type === 'math') {
+                el.classList.add('block-logic');
+                el.innerHTML = `<div class="block-row">let <input type="text" class="var-name" style="width:50px;" placeholder="x" ${stopDrag}> = <input type="text" class="math-a" style="width:40px;" ${stopDrag}> <select class="math-op" ${stopDrag}><option>+</option><option>-</option><option>*</option><option>/</option></select> <input type="text" class="math-b" style="width:40px;" ${stopDrag}></div>`;
+            }
+            else if (type === 'repeat') {
+                el.classList.add('block-loop');
+                el.innerHTML = `<div class="block-row">🔁 Repeat <input type="text" class="rep-count" style="width:40px;" value="3" ${stopDrag}> times {</div>`;
+            }
+            else if (type === 'endrepeat') {
+                el.classList.add('block-loop'); el.innerHTML = '} End Repeat';
+            }
+            else if (type === 'print') {
+                el.classList.add('block-output');
+                el.innerHTML = `<div class="block-row">🖨️ type( <input type="text" placeholder="message" class="print-val" ${stopDrag}> )</div>`;
+            }
+            else if (type === 'ai') {
+                el.classList.add('block-ai');
+                el.innerHTML = `<div>🧠 Init Isaahi AI</div><input type="password" class="ai-key" placeholder="Groq API Key (Secure)" ${stopDrag}><textarea class="ai-prompt" rows="2" placeholder="Prompt: You are Isaahi AI..." ${stopDrag}></textarea>`;
+            }
+            return el;
+        }
+
+        // Load default blocks to show off the new Math and Loop features!
+        window.onload = function() {
+            const canvas = document.getElementById('blockCanvas');
+            document.getElementById('canvasHint').style.display = 'none';
+            
+            canvas.appendChild(createBlockElement('start'));
+            
+            let v = createBlockElement('var');
+            v.querySelector('.var-name').value = 'score'; v.querySelector('.var-val').value = '0';
+            canvas.appendChild(v);
+            
+            let loop = createBlockElement('repeat');
+            loop.querySelector('.rep-count').value = '5';
+            canvas.appendChild(loop);
+            
+            let m = createBlockElement('math');
+            m.querySelector('.var-name').value = 'score';
+            m.querySelector('.math-a').value = 'score';
+            m.querySelector('.math-op').value = '+';
+            m.querySelector('.math-b').value = '10';
+            canvas.appendChild(m);
+            
+            let p = createBlockElement('print');
+            p.querySelector('.print-val').value = 'score';
+            canvas.appendChild(p);
+            
+            canvas.appendChild(createBlockElement('endrepeat'));
+            canvas.appendChild(createBlockElement('end'));
+        };
+
+        // ==========================================
+        // 2. BLOCK-TO-TEXT COMPILER
+        // ==========================================
+        function compileAndRun() {
+            const blocks = document.getElementById('blockCanvas').children;
+            let generatedCode = "";
+
+            for (let i = 0; i < blocks.length; i++) {
+                const b = blocks[i];
+                if (b.id === 'canvasHint') continue;
+                const type = b.dataset.type;
+
+                if (type === 'start') generatedCode += "start:SBFB\n";
+                else if (type === 'end') generatedCode += "<end:SBFB>\n";
+                else if (type === 'html') generatedCode += `insert html (block.html)\n${b.querySelector('.val-code').value}\nend:insert\n`;
+                else if (type === 'js') generatedCode += `insert javascript (block.js)\n${b.querySelector('.val-code').value}\nend:insert\n`;
+                else if (type === 'py') generatedCode += `insert python (block.py)\n${b.querySelector('.val-code').value}\nend:insert\n`;
+                else if (type === 'var') {
+                    let val = b.querySelector('.var-val').value;
+                    if (isNaN(val) && !val.startsWith('"')) val = `"${val}"`;
+                    generatedCode += `let ${b.querySelector('.var-name').value} = ${val}\n`;
+                }
+                else if (type === 'math') {
+                    const name = b.querySelector('.var-name').value;
+                    const a = b.querySelector('.math-a').value;
+                    const op = b.querySelector('.math-op').value;
+                    const bVal = b.querySelector('.math-b').value;
+                    generatedCode += `let ${name} = ${a} ${op} ${bVal}\n`;
+                }
+                else if (type === 'repeat') generatedCode += `repeat ${b.querySelector('.rep-count').value} {\n`;
+                else if (type === 'endrepeat') generatedCode += `}\n`;
+                else if (type === 'print') {
+                    const val = b.querySelector('.print-val').value;
+                    generatedCode += val.startsWith('"') ? `type (${val})\n` : `type ("${val}")\n`;
+                    // If it matches a known variable, the parser handles removing quotes
+                }
+                else if (type === 'ai') {
+                    generatedCode += `set_api_key "${b.querySelector('.ai-key').value}"\n`;
+                    generatedCode += `insert:tool brain ai\n{\n${b.querySelector('.ai-prompt').value}\n}\n`;
+                }
+            }
+
+            document.getElementById("codeInput").value = generatedCode;
+            runSBFB();
+        }
+
+        // ==========================================
+        // 3. SBFB PARSING ENGINE
+        // ==========================================
+        window.SBFB_API_KEY = "";
+        let currentAiPrompt = "";
+        let chatHistory = [];
+
+        async function callGroqAPI(systemPrompt, userMessage) {
+            if (!window.SBFB_API_KEY) throw new Error("Missing Groq API Key! Please type it into the AI block.");
+            const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${window.SBFB_API_KEY}`, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    model: "llama3-8b-8192", 
+                    messages: [ { role: "system", content: systemPrompt }, ...chatHistory, { role: "user", content: userMessage } ]
+                })
+            });
+            if (!response.ok) throw new Error(`Groq API Error: ${response.status}`);
+            const data = await response.json();
+            const aiMessage = data.choices[0].message.content;
+            chatHistory.push({ role: "user", content: userMessage });
+            chatHistory.push({ role: "assistant", content: aiMessage });
+            return aiMessage;
+        }
+
+        async function runSBFB() {
+            const code = document.getElementById("codeInput").value;
+            const terminal = document.getElementById("outputScreen");
+            const preview = document.getElementById("webPreview");
+            const chatBox = document.getElementById("aiChatBox");
+            
+            terminal.innerHTML = "--- Running SBFB Block Engine ---\n";
+            chatBox.style.display = "none"; 
+            chatHistory = []; 
+            
+            let htmlContent = ""; let jsContent = "";
+            let isRunning = false;
+            let memory = {}; 
+            const allLines = code.split('\n');
+
+            // Helper to evaluate variables vs raw strings
+            function parseVal(vStr) {
+                if (vStr.startsWith('"') && vStr.endsWith('"')) return vStr.substring(1, vStr.length - 1);
+                if (!isNaN(vStr)) return Number(vStr);
+                if (memory[vStr] !== undefined) return memory[vStr];
+                return vStr;
+            }
+
+            async function processLines(linesArray) {
+                let isBrainMode = false, isCapturingPrompt = false;
+                let isPythonMode = false, isHtmlMode = false, isJsMode = false;
+                let aiPrompt = "";
+
+                for (let i = 0; i < linesArray.length; i++) {
+                    let line = linesArray[i].trim();
+                    let lowerLine = line.toLowerCase();
+                    let rawLine = linesArray[i]; 
+                    
+                    if (line === "") continue;
+
+                    if (lowerLine === "start:sbfb") { isRunning = true; continue; }
+                    if (lowerLine === "<end>" || lowerLine === "<end:sbfb>") {
+                        if (linesArray === allLines) terminal.innerHTML += "--- Program Finished ---\n";
+                        isRunning = false; break;
+                    }
+
+                    if (isRunning) {
+                        // EXIT MULTI-LINE MODES
+                        if (lowerLine === "end:insert") {
+                            isHtmlMode = false; isJsMode = false; isPythonMode = false; isBrainMode = false; continue;
+                        }
+
+                        // API KEY SETTER
+                        if (lowerLine.startsWith('set_api_key "')) {
+                            window.SBFB_API_KEY = line.substring(13, line.length - 1);
+                            continue;
+                        }
+
+                        // VARIABLE MATH ASSIGNMENT (let x = a + b)
+                        if (lowerLine.startsWith("let ") && line.includes("=")) {
+                            let parts = line.substring(4).split("=");
+                            let varName = parts[0].trim();
+                            let varValStr = parts[1].trim();
+                            
+                            let finalVal = 0;
+                            // Math Parser
+                            if (varValStr.includes("+") || varValStr.includes("-") || varValStr.includes("*") || varValStr.includes("/")) {
+                                let op = '+';
+                                if(varValStr.includes('+')) op = '+';
+                                else if(varValStr.includes('-')) op = '-';
+                                else if(varValStr.includes('*')) op = '*';
+                                else if(varValStr.includes('/')) op = '/';
+
+                                let mathParts = varValStr.split(op);
+                                let a = parseVal(mathParts[0].trim());
+                                let b = parseVal(mathParts[1].trim());
+
+                                if(op==='+') finalVal = a + b;
+                                if(op==='-') finalVal = a - b;
+                                if(op==='*') finalVal = a * b;
+                                if(op==='/') finalVal = a / b;
+                            } else {
+                                finalVal = parseVal(varValStr);
+                            }
+                            memory[varName] = finalVal; 
+                            continue;
+                        }
+
+                        // REPEAT LOOPS
+                        if (lowerLine.startsWith("repeat ") && lowerLine.endsWith("{")) {
+                            let countStr = lowerLine.substring(7, lowerLine.length - 1).trim();
+                            let count = parseVal(countStr);
+
+                            let loopBody = [];
+                            let brackets = 1;
+                            i++; 
+                            while(i < linesArray.length && brackets > 0) {
+                                let innerLine = linesArray[i].trim();
+                                if (innerLine.endsWith("{")) brackets++;
+                                if (innerLine === "}") brackets--;
+                                if (brackets > 0) loopBody.push(linesArray[i]);
+                                i++;
+                            }
+                            i--; 
+
+                            for (let c = 0; c < count; c++) await processLines(loopBody);
+                            continue;
+                        }
+
+                        // PRINT COMMANDS
+                        let noSpaceSbfb = line.replace(/\s+/g, '');
+                        if (noSpaceSbfb.startsWith('type("') && noSpaceSbfb.endsWith('")')) {
+                            let firstQ = line.indexOf('"'); let lastQ = line.lastIndexOf('"');
+                            let text = line.substring(firstQ + 1, lastQ);
+                            // If user typed "score" instead of score, check if it's a var, otherwise print raw
+                            if (memory[text] !== undefined) terminal.innerHTML += `<span class="var-text">${memory[text]}</span>\n`;
+                            else terminal.innerHTML += text + "\n";
+                            continue;
+                        }
+
+                        // MULTI-LINE SCRIPT MODES
+                        if (lowerLine.startsWith("insert html (")) { isHtmlMode = true; continue; }
+                        if (lowerLine.startsWith("insert javascript (")) { isJsMode = true; continue; }
+                        if (lowerLine.startsWith("insert python (")) { isPythonMode = true; continue; }
+                        
+                        if (isPythonMode) {
+                            let pyNoSpace = line.replace(/\s+/g, ''); 
+                            if (pyNoSpace.startsWith('print("') && pyNoSpace.endsWith('")')) {
+                                let fq = line.indexOf('"'); let lq = line.lastIndexOf('"');
+                                terminal.innerHTML += line.substring(fq + 1, lq) + "\n";
+                            }
+                            continue;
+                        }
+                        if (isHtmlMode) { htmlContent += rawLine + "\n"; continue; }
+                        if (isJsMode) { jsContent += rawLine + "\n"; continue; }
+
+                        // AI BRAIN
+                        if (lowerLine === "insert:tool brain ai" || lowerLine === "import:tool brain ai") {
+                            terminal.innerHTML += `[System Note: Initializing Isaahi AI Brain...]\n`;
+                            isBrainMode = true; continue; 
+                        }
+                        if (isBrainMode) {
+                            if (line === "{") { isCapturingPrompt = true; continue; }
+                            if (line === "}") { 
+                                isCapturingPrompt = false; currentAiPrompt = aiPrompt; 
+                                terminal.innerHTML += `[System Note: AI ready. Chat unlocked!]\n`;
+                                chatBox.style.display = "flex"; continue; 
+                            }
+                            if (isCapturingPrompt) { aiPrompt += rawLine + "\n"; continue; }
+                        }
+                    }
+                }
+            }
+
+            await processLines(allLines);
+            preview.srcdoc = htmlContent + "\n<script>" + jsContent + "<\/script>";
+        }
+
+        async function chatWithIsaahi() {
+            const inputField = document.getElementById("userChatMsg");
+            const terminal = document.getElementById("outputScreen");
+            const userMsg = inputField.value;
+            if (!userMsg) return;
+            
+            terminal.innerHTML += `\nYou: ${userMsg}\n`;
+            inputField.value = ""; 
+
+            try {
+                terminal.innerHTML += `<span style="color:gray;" id="chatLoadingIndicator">Isaahi is typing...</span>\n`;
+                terminal.scrollTop = terminal.scrollHeight; 
+                let aiResponse = await callGroqAPI(currentAiPrompt, userMsg);
+                document.getElementById("chatLoadingIndicator").remove();
+                terminal.innerHTML += `<span class="ai-text">Isaahi AI: ${aiResponse}</span>\n\n`;
+                terminal.scrollTop = terminal.scrollHeight; 
+            } catch (error) {
+                if (document.getElementById("chatLoadingIndicator")) document.getElementById("chatLoadingIndicator").remove();
+                terminal.innerHTML += `<span class="error-text">${error.message}</span>\n\n`;
+            }
+        }
+    </script>
+</body>
+</html>
