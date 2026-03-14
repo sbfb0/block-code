@@ -64,6 +64,14 @@
         /* Delete Zone */
         .delete-zone { height: 40px; margin-top: 10px; background: #ff555533; border: 1px dashed #ff5555; color: #ff5555; display: flex; justify-content: center; align-items: center; border-radius: 5px; font-weight: bold; }
         
+        /* Custom Context Menu */
+        .context-menu {
+            display: none; position: absolute; background: #2a2a2a; border: 1px solid #444; border-radius: 4px;
+            padding: 5px 0; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 1000;
+        }
+        .context-menu div { padding: 8px 15px; color: #ff5555; cursor: pointer; font-size: 14px; font-weight: bold; transition: background 0.2s; }
+        .context-menu div:hover { background: #444; }
+        
         .btn { background-color: #4CAF50; color: white; padding: 12px 20px; border: none; cursor: pointer; font-size: 16px; border-radius: 5px; margin-top: 10px; font-weight: bold; width: 100%; transition: 0.2s; }
         .btn:hover { background-color: #45a049; }
         
@@ -85,6 +93,11 @@
     </style>
 </head>
 <body>
+
+    <!-- Custom Right Click Menu -->
+    <div id="customContextMenu" class="context-menu">
+        <div onclick="deleteRightClickedBlock()">🗑️ Delete Block</div>
+    </div>
 
     <div class="top-bar">
         <h1>SBFB Studio <span style="color:#aaa; font-size: 16px;">| Visual Block Coder</span></h1>
@@ -157,6 +170,44 @@
         // 1. BLOCK GENERATION & DRAG/DROP
         // ==========================================
         let blockIdCounter = 0;
+        let rightClickedBlock = null;
+
+        // --- NEW: Custom Context Menu Logic ---
+        document.addEventListener('contextmenu', function(e) {
+            const block = e.target.closest('.block');
+            const canvas = document.getElementById('blockCanvas');
+            
+            // If we right-clicked a block that is currently inside the canvas
+            if (block && canvas.contains(block)) {
+                e.preventDefault(); // Prevent standard browser menu
+                rightClickedBlock = block;
+                const menu = document.getElementById('customContextMenu');
+                menu.style.display = 'block';
+                menu.style.left = e.pageX + 'px';
+                menu.style.top = e.pageY + 'px';
+            } else {
+                document.getElementById('customContextMenu').style.display = 'none';
+            }
+        });
+
+        // Hide the menu if you click anywhere else
+        document.addEventListener('click', function(e) {
+            document.getElementById('customContextMenu').style.display = 'none';
+        });
+
+        // Function triggered by clicking "Delete Block" in the right-click menu
+        function deleteRightClickedBlock() {
+            if (rightClickedBlock) {
+                rightClickedBlock.remove();
+                rightClickedBlock = null;
+                
+                // Show hint if canvas is empty again
+                if (document.getElementById('blockCanvas').children.length <= 1) {
+                    document.getElementById('canvasHint').style.display = 'block';
+                }
+            }
+        }
+        // --- END NEW LOGIC ---
 
         function allowDrop(ev) {
             ev.preventDefault();
